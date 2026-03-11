@@ -1,11 +1,22 @@
-// ─── RESUME PREVIEW TEMPLATES ────────────────────────────────────────────────
-function ResumePreview({ data, template }) {
-  const t = TEMPLATE_THEMES[template] || TEMPLATE_THEMES.Modern;
+import ModernTemplate from "../Templates/ModernTemplate";
+import ClassicTemplate from "../Templates/ClassicTemplate";
+import CreativeTemplate from "../Templates/CreativeTemplate";
+import MinimalTemplate from "../Templates/MinimalTemplate";
+import BoldTemplate from "../Templates/BoldTemplate";
+import ElegantTemplate from "../Templates/ElegantTemplate";
+import { TEMPLATE_THEMES } from "../utils/Constants";
 
-  if (template === "Classic") return <ClassicTemplate data={data} t={t} />;
-  if (template === "Creative") return <CreativeTemplate data={data} t={t} />;
-  if (template === "Minimal") return <MinimalTemplate data={data} t={t} />;
-  if (template === "Bold") return <BoldTemplate data={data} t={t} />;
-  if (template === "Elegant") return <ElegantTemplate data={data} t={t} />;
-  return <ModernTemplate data={data} t={t} />;
+export default function ResumePreview({ data, template }) {
+  const t = TEMPLATE_THEMES[template] ?? TEMPLATE_THEMES.Modern;
+
+  const props = { data, t };
+
+  switch (template) {
+    case "Classic":  return <ClassicTemplate  {...props} />;
+    case "Creative": return <CreativeTemplate {...props} />;
+    case "Minimal":  return <MinimalTemplate  {...props} />;
+    case "Bold":     return <BoldTemplate     {...props} />;
+    case "Elegant":  return <ElegantTemplate  {...props} />;
+    default:         return <ModernTemplate   {...props} />;
+  }
 }
