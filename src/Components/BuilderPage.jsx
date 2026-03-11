@@ -103,20 +103,65 @@ export default function BuilderPage({
   const removeListItem = (field, idx) =>
     setData((d) => ({ ...d, [field]: d[field].filter((_, i) => i !== idx) }));
 
-  /* ── print ───────────────────────────────────────────────────────────── */
-  const printResume = () => {
-    const content = previewRef.current?.innerHTML;
-    if (!content) return;
-    const w = window.open("", "_blank");
-    w.document.write(
-      `<html><head><title>${data.name || "Resume"}</title>
-      <style>*{margin:0;padding:0;box-sizing:border-box}body{font-size:12px}
-      @media print{body{margin:0}}</style></head>
-      <body>${content}</body></html>`
-    );
-    w.document.close();
-    w.focus();
-    setTimeout(() => { w.print(); w.close(); }, 500);
+  /* ── PDF download ────────────────────────────────────────────────────── */
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const downloadPDF = async () => {
+    const node = previewRef.current;
+    if (!node) return;
+    setPdfLoading(true);
+    try {
+      // Dynamically load libraries so they don't bloat the initial bundle
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      // Capture at 2× scale for crisp output
+      const canvas = await html2canvas(node, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+        // Force background-color printing
+        onclone: (clonedDoc) => {
+          const style = clonedDoc.createElement("style");
+          style.textContent = `
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+            }
+          `;
+          clonedDoc.head.appendChild(style);
+        },
+      });
+
+      const imgData  = canvas.toDataURL("image/jpeg", 1.0);
+      const pdf      = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageW    = pdf.internal.pageSize.getWidth();
+      const pageH    = pdf.internal.pageSize.getHeight();
+      const imgW     = pageW;
+      const imgH     = (canvas.height * pageW) / canvas.width;
+
+      // If content is taller than one page, split across pages
+      if (imgH <= pageH) {
+        pdf.addImage(imgData, "JPEG", 0, 0, imgW, imgH);
+      } else {
+        let yOffset = 0;
+        while (yOffset < imgH) {
+          pdf.addImage(imgData, "JPEG", 0, -yOffset, imgW, imgH);
+          yOffset += pageH;
+          if (yOffset < imgH) pdf.addPage();
+        }
+      }
+
+      pdf.save(`${data.name ? data.name.replace(/\s+/g, "_") : "Resume"}_Resume.pdf`);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      alert("PDF export failed. Please try again.");
+    }
+    setPdfLoading(false);
   };
 
   /* ── AI shorthands ───────────────────────────────────────────────────── */
@@ -175,10 +220,11 @@ export default function BuilderPage({
           </button>
 
           <button
-            onClick={printResume}
-            className="hidden md:flex items-center gap-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all"
+            onClick={downloadPDF}
+            disabled={pdfLoading}
+            className="hidden md:flex items-center gap-1.5 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all"
           >
-            <Icon name="download" size={15} /> Download PDF
+            {pdfLoading ? <><span className="animate-spin inline-block mr-1">⟳</span>Exporting…</> : <><Icon name="download" size={15} /><span className="ml-1">Download PDF</span></>}
           </button>
         </div>
       </header>
@@ -412,8 +458,8 @@ export default function BuilderPage({
 
           {/* Mobile Download Button */}
           <div className="md:hidden p-4 border-t border-slate-200">
-            <button onClick={printResume} className="w-full flex items-center justify-center gap-2 bg-indigo-500 text-white font-bold py-3 rounded-xl">
-              <Icon name="download" size={16} /> Download PDF
+            <button onClick={downloadPDF} disabled={pdfLoading} className="w-full flex items-center justify-center gap-2 bg-indigo-500 disabled:opacity-60 text-white font-bold py-3 rounded-xl">
+              {pdfLoading ? <><span className="animate-spin">⟳</span> Exporting…</> : <><Icon name="download" size={16} /> Download PDF</>}
             </button>
           </div>
         </div>
@@ -425,11 +471,12 @@ export default function BuilderPage({
               <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
                 Live Preview · {template} Template
               </span>
-              <button onClick={printResume} className="hidden md:flex items-center gap-1.5 text-xs text-indigo-600 font-semibold hover:text-indigo-800">
-                <Icon name="download" size={12} /> Print / Save PDF
+              <button onClick={downloadPDF} disabled={pdfLoading} className="hidden md:flex items-center gap-1.5 text-xs text-indigo-600 font-semibold hover:text-indigo-800 disabled:opacity-60">
+                {pdfLoading ? <span className="animate-spin">⟳</span> : <Icon name="download" size={12} />}
+                {pdfLoading ? " Exporting…" : " Download PDF"}
               </button>
             </div>
-            <div ref={previewRef} className="bg-white shadow-2xl rounded-xl overflow-hidden" style={{ minHeight: "800px" }}>
+            <div ref={previewRef} className="resume-preview-root bg-white shadow-2xl rounded-xl overflow-hidden" style={{ minHeight: "800px", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}>
               <ResumePreview data={data} template={template} />
             </div>
           </div>
