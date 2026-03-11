@@ -182,7 +182,7 @@ export default function BuilderPage({
           </button>
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-indigo-500 flex items-center justify-center font-black text-white text-xs">R</div>
-            <span className="font-bold text-slate-900 hidden sm:block text-sm">ResumeForge</span>
+            <span className="font-bold text-slate-900 hidden sm:block text-sm">ResuMint</span>
           </div>
         </div>
 
@@ -258,13 +258,13 @@ export default function BuilderPage({
             {activeSection === "personal" && (
               <div>
                 <h2 className="text-base font-black text-slate-900 mb-4">Personal Information</h2>
-                <Input label="Full Name"         value={data.name}     onChange={(v) => update("name", v)}     placeholder="Alex Johnson" />
-                <Input label="Job Title"         value={data.title}    onChange={(v) => update("title", v)}    placeholder="Senior Product Designer" />
+                <Input label="Full Name"         value={data.name}     onChange={(v) => update("name", v)}     placeholder="Evan Chimwaza" />
+                <Input label="Job Title"         value={data.title}    onChange={(v) => update("title", v)}    placeholder="Senior AI Engineer" />
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label="Email" value={data.email} onChange={(v) => update("email", v)} placeholder="alex@email.com" />
-                  <Input label="Phone" value={data.phone} onChange={(v) => update("phone", v)} placeholder="+1 555 234 5678" />
+                  <Input label="Email" value={data.email} onChange={(v) => update("email", v)} placeholder="evan@email.com" />
+                  <Input label="Phone" value={data.phone} onChange={(v) => update("phone", v)} placeholder="+265 980 118 612" />
                 </div>
-                <Input label="Location"           value={data.location} onChange={(v) => update("location", v)} placeholder="San Francisco, CA" />
+                <Input label="Location"           value={data.location} onChange={(v) => update("location", v)} placeholder="Lilongwe, Malawi" />
                 <Input label="Website / LinkedIn" value={data.website}  onChange={(v) => update("website", v)}  placeholder="linkedin.com/in/yourname" />
                 <button
                   onClick={() => setData(sampleData)}

@@ -13,22 +13,22 @@ const EMPTY_DATA = {
 };
 
 const SAMPLE_DATA = {
-  name: "Alex Johnson",
-  title: "Senior Product Designer",
-  email: "alex.johnson@email.com",
-  phone: "+1 (555) 234-5678",
-  location: "San Francisco, CA",
-  website: "alexjohnson.design",
+  name: "Evan Chimwaza",
+  title: "Senior AI Engineer",
+  email: "evan.chimwaza@email.com",
+  phone: "+265 (980) 011-8612",
+  location: "Lilongwe, MALAWI",
+  website: "evanchimwaza.example.design",
   summary:
     "Creative product designer with 7+ years of experience crafting intuitive digital experiences. Proven ability to lead design systems, collaborate cross-functionally, and ship products used by millions. Passionate about accessibility and human-centered design.",
   experience: [
     {
       id: 1,
       company: "Stripe",
-      role: "Senior Product Designer",
+      role: "Senior AI Engineer",
       period: "2021 – Present",
       bullets: [
-        "Led redesign of core dashboard used by 500K+ businesses",
+        "Created redesign of core dashboard used by 500K+ businesses",
         "Built and maintained Stripe's design system (Sail UI)",
         "Mentored 3 junior designers and established design review process",
       ],
@@ -58,10 +58,10 @@ const SAMPLE_DATA = {
   education: [
     {
       id: 1,
-      school: "Rhode Island School of Design",
-      degree: "BFA, Graphic Design",
+      school: "University Of Malawi",
+      degree: "Computer Science",
       year: "2016",
-      gpa: "3.9",
+      gpa: "3.4",
     },
   ],
   skills: [
@@ -72,7 +72,7 @@ const SAMPLE_DATA = {
     "Google UX Design Certificate",
     "Nielsen Norman UX Certification",
   ],
-  languages: ["English (Native)", "Spanish (Conversational)"],
+  languages: ["English (Native)", "French (Conversational)"],
 };
 
 export { EMPTY_DATA, SAMPLE_DATA };

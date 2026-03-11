@@ -5,14 +5,12 @@ import { SAMPLE_DATA } from "../App";
 
 export default function HomePage({ onStart, onSample, setTemplate }) {
   return (
-    <div className="min-h-screen bg-slate-950 text-white overflow-x-hidden">
+    <div className="min-h-screen bg-zinc-900 text-white overflow-x-hidden">
       {/* ── Nav ──────────────────────────────────────────────────────────── */}
       <nav className="flex items-center justify-between px-6 py-4 border-b border-slate-800 sticky top-0 z-50 bg-slate-950/90 backdrop-blur">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center font-black text-sm">
-            R
-          </div>
-          <span className="font-bold text-lg tracking-tight">ResumeForge</span>
+          
+          <span className="font-bold text-lg tracking-tight">ResuMint</span>
         </div>
         <div className="hidden md:flex items-center gap-6 text-sm text-slate-400">
           <a href="#templates" className="hover:text-white transition-colors">Templates</a>
