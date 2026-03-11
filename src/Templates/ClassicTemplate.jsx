@@ -1,4 +1,4 @@
-unction ClassicTemplate({ data, t }) {
+function ClassicTemplate({ data, t }) {
   return (
     <div style={{ fontFamily: "'Times New Roman', serif", background: "#fff", color: "#1a1a1a", minHeight: "100%", fontSize: "10px", padding: "28px 32px" }}>
       <div style={{ textAlign: "center", borderBottom: `2px solid ${t.accent}`, paddingBottom: "14px", marginBottom: "16px" }}>
