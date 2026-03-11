@@ -1,1 +1,32 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Force browsers to preserve background colors and images
+ * when capturing with html2canvas or printing.
+ * This fixes the "colors disappear in PDF" issue.
+ */
+*,
+*::before,
+*::after {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+  color-adjust: exact !important;
+}
+
+/* Ensure resume preview never clips colors */
+.resume-preview-root {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+  color-adjust: exact !important;
+}
+
+/* Smooth spin animation for loading states */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  display: inline-block;
+  animation: spin 0.8s linear infinite;
+}

@@ -1,4 +1,4 @@
-function CreativeTemplate({ data, t }) {
+export default function CreativeTemplate({ data, t }) {
   return (
     <div style={{ fontFamily: "'Arial', sans-serif", display: "flex", minHeight: "100%", fontSize: "10px" }}>
       <div style={{ width: "35%", background: t.sidebar, color: "#fff", padding: "24px 16px" }}>
