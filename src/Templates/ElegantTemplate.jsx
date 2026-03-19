@@ -58,7 +58,7 @@ export default function ElegantTemplate({ data, t }) {
                 </div>
                 <div style={{ color: t.accent, fontSize: "10px", marginBottom: "4px", fontStyle: "italic" }}>{e.company}</div>
                 <ul style={{ margin: 0, paddingLeft: "16px", color: "#555" }}>
-                  {e.bullets.filter((b) => b).map((b, i) => (
+                  {e.bullets || [].map((b, i) => (
                     <li key={i} style={{ marginBottom: "2px" }}>{b}</li>
                   ))}
                 </ul>

@@ -74,7 +74,7 @@ export default function CreativeTemplate({ data, t }) {
                   <div style={{ fontWeight: "700", fontSize: "10px" }}>{e.role}</div>
                   <div style={{ color: t.accent, fontSize: "9px" }}>{e.company}{e.period ? ` · ${e.period}` : ""}</div>
                   <ul style={{ margin: "4px 0", paddingLeft: "14px", color: "#555" }}>
-                    {e.bullets.filter((b) => b).map((b, i) => (
+                    {e.bullets || [].map((b, i) => (
                       <li key={i} style={{ marginBottom: "2px" }}>{b}</li>
                     ))}
                   </ul>

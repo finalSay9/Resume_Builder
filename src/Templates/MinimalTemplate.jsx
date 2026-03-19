@@ -46,7 +46,7 @@ export default function MinimalTemplate({ data, t }) {
                   <div style={{ fontWeight: "600" }}>{e.role}</div>
                   <div style={{ color: "#888", fontSize: "9px", marginBottom: "4px" }}>{e.company}</div>
                   <ul style={{ margin: 0, paddingLeft: "14px", color: "#555" }}>
-                    {e.bullets.filter((b) => b).map((b, i) => (
+                    {e.bullets || [].map((b, i) => (
                       <li key={i}>{b}</li>
                     ))}
                   </ul>
