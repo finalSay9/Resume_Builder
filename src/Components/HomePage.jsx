@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import ResumePreview from "./ResumeReview";
 import { TEMPLATE_THEMES, TEMPLATE_NAMES } from "../utils/Constants";
 import { SAMPLE_DATA } from "../App";
-import { parseCV, readFileAsText } from "../utils/cvParser";
+import { parseCVToModel, readFileAsText } from "../utils/cvParser";
 
 export default function HomePage({ onStart, onSample, onUpload, setTemplate }) {
   const fileInputRef  = useRef(null);
@@ -17,7 +17,7 @@ export default function HomePage({ onStart, onSample, onUpload, setTemplate }) {
     setUploadError("");
     try {
       const text   = await readFileAsText(file);
-      const parsed = parseCV(text);
+      const parsed = parseCVToModel(text);
       onUpload(parsed);
     } catch (err) {
       console.error(err);

@@ -112,52 +112,7 @@ export default function BuilderPage({
     if (!node) return;
     setPdfLoading(true);
     try {
-      // Dynamically load libraries so they don't bloat the initial bundle
-      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-        import("html2canvas"),
-        import("jspdf"),
-      ]);
-
-      // Capture at 2× scale for crisp output
-      const canvas = await html2canvas(node, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#ffffff",
-        // Force background-color printing
-        onclone: (clonedDoc) => {
-          const style = clonedDoc.createElement("style");
-          style.textContent = `
-            * {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-              color-adjust: exact !important;
-            }
-          `;
-          clonedDoc.head.appendChild(style);
-        },
-      });
-
-      const imgData  = canvas.toDataURL("image/jpeg", 1.0);
-      const pdf      = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pageW    = pdf.internal.pageSize.getWidth();
-      const pageH    = pdf.internal.pageSize.getHeight();
-      const imgW     = pageW;
-      const imgH     = (canvas.height * pageW) / canvas.width;
-
-      // If content is taller than one page, split across pages
-      if (imgH <= pageH) {
-        pdf.addImage(imgData, "JPEG", 0, 0, imgW, imgH);
-      } else {
-        let yOffset = 0;
-        while (yOffset < imgH) {
-          pdf.addImage(imgData, "JPEG", 0, -yOffset, imgW, imgH);
-          yOffset += pageH;
-          if (yOffset < imgH) pdf.addPage();
-        }
-      }
-
-      pdf.save(`${data.name ? data.name.replace(/\s+/g, "_") : "Resume"}_Resume.pdf`);
+      await downloadResume(node, data.name || "Resume");
     } catch (err) {
       console.error("PDF generation failed:", err);
       alert("PDF export failed. Please try again.");
@@ -182,7 +137,7 @@ export default function BuilderPage({
             <Icon name="back" size={20} />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-indigo-500 flex items-center justify-center font-black text-white text-xs">R</div>
+            <div className="w-7 h-7 rounded-lg bg-teal-600 flex items-center justify-center font-black text-white text-xs">R</div>
             <span className="font-bold text-slate-900 hidden sm:block text-sm">ResumeForge</span>
           </div>
         </div>
@@ -194,7 +149,7 @@ export default function BuilderPage({
               key={t}
               onClick={() => setTemplate(t)}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                template === t ? "bg-white shadow text-indigo-600" : "text-slate-500 hover:text-slate-800"
+                template === t ? "bg-white shadow text-teal-600" : "text-slate-500 hover:text-slate-800"
               }`}
             >
               {t}
@@ -207,14 +162,14 @@ export default function BuilderPage({
           <select
             value={template}
             onChange={(e) => setTemplate(e.target.value)}
-            className="md:hidden text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="md:hidden text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400"
           >
             {TEMPLATE_NAMES.map((t) => <option key={t}>{t}</option>)}
           </select>
 
           <button
             onClick={() => setShowMobilePreview((p) => !p)}
-            className="md:hidden flex items-center gap-1 bg-indigo-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg"
+            className="md:hidden flex items-center gap-1 bg-teal-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg"
           >
             <Icon name={showMobilePreview ? "edit" : "eye"} size={13} />
             {showMobilePreview ? "Edit" : "Preview"}
@@ -223,7 +178,7 @@ export default function BuilderPage({
           <button
             onClick={downloadPDF}
             disabled={pdfLoading}
-            className="hidden md:flex items-center gap-1.5 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all"
+            className="hidden md:flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all"
           >
             {pdfLoading ? <><span className="animate-spin inline-block mr-1">⟳</span>Exporting…</> : <><Icon name="download" size={15} /><span className="ml-1">Download PDF</span></>}
           </button>
@@ -244,7 +199,7 @@ export default function BuilderPage({
                 onClick={() => setActiveSection(s.id)}
                 className={`px-3 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${
                   activeSection === s.id
-                    ? "bg-indigo-500 text-white"
+                    ? "bg-teal-600 text-white"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
@@ -269,7 +224,7 @@ export default function BuilderPage({
                 <Input label="Website / LinkedIn" value={data.website}  onChange={(v) => update("website", v)}  placeholder="linkedin.com/in/yourname" />
                 <button
                   onClick={() => setData(sampleData)}
-                  className="mt-2 w-full text-xs text-indigo-500 hover:text-indigo-700 font-semibold border border-dashed border-indigo-300 py-2 rounded-lg transition-colors"
+                  className="mt-2 w-full text-xs text-teal-600 hover:text-teal-700 font-semibold border border-dashed border-teal-300 py-2 rounded-lg transition-colors"
                 >
                   Load Sample Data
                 </button>
@@ -318,7 +273,7 @@ export default function BuilderPage({
                           value={b}
                           onChange={(e) => updateExpBullet(idx, bi, e.target.value)}
                           placeholder={`Achievement ${bi + 1}...`}
-                          className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                          className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
                         />
                         {exp.bullets.length > 1 && (
                           <button onClick={() => removeExpBullet(idx, bi)} className="text-red-400 hover:text-red-600">
@@ -331,14 +286,14 @@ export default function BuilderPage({
                     <div className="flex gap-2 mt-2">
                       <button
                         onClick={() => addExpBullet(idx)}
-                        className="flex-1 flex items-center justify-center gap-1 text-xs text-slate-500 hover:text-indigo-600 border border-dashed border-slate-300 hover:border-indigo-300 py-1.5 rounded-lg transition-all"
+                        className="flex-1 flex items-center justify-center gap-1 text-xs text-slate-500 hover:text-teal-600 border border-dashed border-slate-300 hover:border-teal-300 py-1.5 rounded-lg transition-all"
                       >
                         <Icon name="plus" size={12} /> Add bullet
                       </button>
                       <button
                         onClick={() => handleAIBullets(idx)}
                         disabled={!!aiLoading || !exp.role}
-                        className="flex-1 flex items-center justify-center gap-1 text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 py-1.5 rounded-lg transition-all disabled:opacity-50"
+                        className="flex-1 flex items-center justify-center gap-1 text-xs bg-teal-50 text-teal-600 hover:bg-teal-100 border border-teal-200 py-1.5 rounded-lg transition-all disabled:opacity-50"
                       >
                         {aiLoading === "bullets" ? <span className="animate-spin text-xs">✦</span> : <Icon name="sparkle" size={12} />}
                         AI Bullets
@@ -382,19 +337,19 @@ export default function BuilderPage({
                 <h2 className="text-base font-black text-slate-900 mb-4">Skills</h2>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {data.skills.map((skill, i) => (
-                    <div key={i} className="flex items-center gap-1 bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1 rounded-full text-xs font-semibold">
+                    <div key={i} className="flex items-center gap-1 bg-teal-50 border border-teal-200 text-teal-700 px-3 py-1 rounded-full text-xs font-semibold">
                       <input
                         value={skill}
                         onChange={(e) => updateListItem("skills", i, e.target.value)}
-                        className="bg-transparent outline-none w-20 min-w-0 text-indigo-700 placeholder:text-indigo-300"
+                        className="bg-transparent outline-none w-20 min-w-0 text-teal-700 placeholder:text-teal-300"
                         placeholder="Skill..."
                       />
-                      <button onClick={() => removeListItem("skills", i)} className="text-indigo-400 hover:text-red-500 ml-1 text-base leading-none">×</button>
+                      <button onClick={() => removeListItem("skills", i)} className="text-teal-500 hover:text-red-500 ml-1 text-base leading-none">×</button>
                     </div>
                   ))}
                   <button
                     onClick={() => addListItem("skills")}
-                    className="flex items-center gap-1 bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 px-3 py-1 rounded-full text-xs font-semibold border border-dashed border-slate-300 hover:border-indigo-300 transition-all"
+                    className="flex items-center gap-1 bg-slate-100 hover:bg-teal-50 text-slate-500 hover:text-teal-600 px-3 py-1 rounded-full text-xs font-semibold border border-dashed border-slate-300 hover:border-teal-300 transition-all"
                   >
                     <Icon name="plus" size={11} /> Add skill
                   </button>
@@ -417,7 +372,7 @@ export default function BuilderPage({
                         value={cert}
                         onChange={(e) => updateListItem("certifications", i, e.target.value)}
                         placeholder="Google UX Design Certificate"
-                        className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400"
                       />
                       {data.certifications.length > 1 && (
                         <button onClick={() => removeListItem("certifications", i)} className="text-red-400 hover:text-red-600">
@@ -426,7 +381,7 @@ export default function BuilderPage({
                       )}
                     </div>
                   ))}
-                  <button onClick={() => addListItem("certifications")} className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 mt-1">
+                  <button onClick={() => addListItem("certifications")} className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 mt-1">
                     <Icon name="plus" size={12} /> Add certification
                   </button>
                 </div>
@@ -440,7 +395,7 @@ export default function BuilderPage({
                         value={lang}
                         onChange={(e) => updateListItem("languages", i, e.target.value)}
                         placeholder="English (Native)"
-                        className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400"
                       />
                       {data.languages.length > 1 && (
                         <button onClick={() => removeListItem("languages", i)} className="text-red-400 hover:text-red-600">
@@ -449,7 +404,7 @@ export default function BuilderPage({
                       )}
                     </div>
                   ))}
-                  <button onClick={() => addListItem("languages")} className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 mt-1">
+                  <button onClick={() => addListItem("languages")} className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 mt-1">
                     <Icon name="plus" size={12} /> Add language
                   </button>
                 </div>
@@ -459,7 +414,7 @@ export default function BuilderPage({
 
           {/* Mobile Download Button */}
           <div className="md:hidden p-4 border-t border-slate-200">
-            <button onClick={downloadPDF} disabled={pdfLoading} className="w-full flex items-center justify-center gap-2 bg-indigo-500 disabled:opacity-60 text-white font-bold py-3 rounded-xl">
+            <button onClick={downloadPDF} disabled={pdfLoading} className="w-full flex items-center justify-center gap-2 bg-teal-600 disabled:opacity-60 text-white font-bold py-3 rounded-xl">
               {pdfLoading ? <><span className="animate-spin">⟳</span> Exporting…</> : <><Icon name="download" size={16} /> Download PDF</>}
             </button>
           </div>
@@ -472,7 +427,7 @@ export default function BuilderPage({
               <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
                 Live Preview · {template} Template
               </span>
-              <button onClick={downloadPDF} disabled={pdfLoading} className="hidden md:flex items-center gap-1.5 text-xs text-indigo-600 font-semibold hover:text-indigo-800 disabled:opacity-60">
+              <button onClick={downloadPDF} disabled={pdfLoading} className="hidden md:flex items-center gap-1.5 text-xs text-teal-600 font-semibold hover:text-teal-800 disabled:opacity-60">
                 {pdfLoading ? <span className="animate-spin">⟳</span> : <Icon name="download" size={12} />}
                 {pdfLoading ? " Exporting…" : " Download PDF"}
               </button>
@@ -494,7 +449,7 @@ function AIButton({ loading, onClick, label, loadingLabel }) {
     <button
       onClick={onClick}
       disabled={loading}
-      className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-semibold py-2.5 rounded-lg transition-all disabled:opacity-50 text-sm"
+      className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-teal-500 to-teal-700 hover:from-teal-600 hover:to-teal-800 text-white font-semibold py-2.5 rounded-lg transition-all disabled:opacity-50 text-sm"
     >
       {loading ? <span className="animate-spin">✦</span> : <Icon name="sparkle" size={15} />}
       {loading ? loadingLabel : label}
@@ -506,7 +461,7 @@ function AddButton({ onClick, label }) {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-slate-300 hover:border-indigo-400 text-slate-500 hover:text-indigo-600 py-3 rounded-xl transition-all text-sm font-semibold"
+      className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-slate-300 hover:border-teal-400 text-slate-500 hover:text-teal-600 py-3 rounded-xl transition-all text-sm font-semibold"
     >
       <Icon name="plus" size={15} /> {label}
     </button>

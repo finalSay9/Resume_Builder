@@ -18,7 +18,7 @@ export default function TextArea({
         placeholder={placeholder}
         rows={rows}
         className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg
-          focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
+          focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent
           bg-white transition-all resize-none placeholder:text-slate-400"
       />
     </div>
