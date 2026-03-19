@@ -1,153 +1,165 @@
 /**
- * Robust plain-text CV parser.
- * Works on TXT exports from Word, LinkedIn, etc.
- * Returns a data object matching the app's resume data shape.
+ * CV Parser — robust plain-text extractor
+ * Handles TXT, and best-effort DOC/DOCX/RTF via binary string scanning.
+ * For PDF: we use PDF.js via CDN (loaded dynamically) to extract real text.
  */
 
+// ─── Section heading detection ────────────────────────────────────────────────
 const SECTION_PATTERNS = {
-  experience:     /^(work\s+)?experience|employment(\s+history)?|career|positions?\s+held/i,
-  education:      /^education|academic|qualifications?|degrees?/i,
-  skills:         /^(technical\s+)?skills?|competenc(ies|y)|expertise|technologies|tools/i,
-  summary:        /^(professional\s+)?(summary|profile|about|objective|overview|bio)/i,
-  certifications: /^certifications?|licenses?|credentials?|accreditations?/i,
-  languages:      /^languages?|linguistic/i,
+  experience:     /^(work\s+)?experience|employment(\s+history)?|career(\s+history)?|positions?\s+held|professional\s+background/i,
+  education:      /^education|academic(\s+background)?|qualifications?|degrees?|schooling/i,
+  skills:         /^(technical\s+)?skills?|competenc(ies|y)|expertise|technologies|tools(\s+&\s+tech)?|core\s+competencies/i,
+  summary:        /^(professional\s+)?(summary|profile|about(\s+me)?|objective|overview|introduction|bio)/i,
+  certifications: /^certifications?|licenses?|credentials?|accreditations?|courses?/i,
+  languages:      /^languages?|linguistic|spoken\s+languages/i,
 };
 
 function detectSection(line) {
+  const clean = line.trim().replace(/[:\-–—_*#]+$/, "").trim();
+  if (clean.length < 3 || clean.length > 60) return null;
   for (const [key, pattern] of Object.entries(SECTION_PATTERNS)) {
-    if (pattern.test(line.trim())) return key;
+    if (pattern.test(clean)) return key;
   }
   return null;
+}
+
+// ─── Field extractors ─────────────────────────────────────────────────────────
+export function extractEmail(text) {
+  const m = text.match(/[\w.+\-]+@[\w\-]+\.[a-zA-Z]{2,}/);
+  return m ? m[0] : "";
+}
+
+export function extractPhone(text) {
+  const m = text.match(/(\+?[\d][\d\s\-().]{6,15}[\d])/);
+  return m ? m[0].replace(/\s+/g, " ").trim() : "";
+}
+
+export function extractWebsite(text) {
+  const m = text.match(/(https?:\/\/[^\s,<>]+|(?:www\.|linkedin\.com\/in\/|github\.com\/)[^\s,<>]+)/i);
+  return m ? m[0].replace(/[.,;)]+$/, "") : "";
+}
+
+export function extractLocation(text) {
+  // "City, ST" or "City, Country" pattern
+  const m = text.match(/\b([A-Z][a-zA-Z\s\-]{2,25},\s*(?:[A-Z]{2}|[A-Z][a-zA-Z\s]{2,20}))\b/);
+  return m ? m[0] : "";
+}
+
+function extractPeriod(line) {
+  const m = line.match(
+    /(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+)?\d{4}\s*[-–—to/]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+)?(?:\d{4}|[Pp]resent|[Cc]urrent|[Nn]ow|[Oo]ngoing)/
+  );
+  return m ? m[0].trim() : "";
 }
 
 function isContactLine(line) {
   return /[@+\d()\-.]/.test(line) && line.length < 80;
 }
 
-function extractEmail(text) {
-  const m = text.match(/[\w.+\-]+@[\w\-]+\.[a-zA-Z]{2,}/);
-  return m ? m[0] : "";
-}
-
-function extractPhone(text) {
-  // Matches international and local formats
-  const m = text.match(/(\+?\d[\d\s\-().]{6,}\d)/);
-  return m ? m[0].trim() : "";
-}
-
-function extractWebsite(text) {
-  const m = text.match(
-    /(https?:\/\/[^\s,]+|(?:www\.|linkedin\.com\/in\/|github\.com\/)[^\s,]+)/i
-  );
-  return m ? m[0] : "";
-}
-
-function extractLocation(text) {
-  // Looks for "City, State" or "City, Country" patterns
-  const m = text.match(/\b([A-Z][a-zA-Z\s]+,\s*[A-Z]{2,})\b/);
-  return m ? m[0] : "";
-}
-
-function extractPeriod(line) {
-  // e.g. "Jan 2020 – Present", "2018-2021", "March 2015 to June 2018"
-  const m = line.match(
-    /(\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+)?\d{4}\s*[-–—to]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+)?\d{4}|\b\d{4}\s*[-–—]\s*(?:\d{4}|[Pp]resent|[Cc]urrent|[Nn]ow)/
-  );
-  return m ? m[0].trim() : "";
-}
-
-function splitBullets(lines) {
-  return lines
-    .map((l) => l.replace(/^[•\-\*\u2022\u2023\u25E6\u2043]\s*/, "").trim())
-    .filter((l) => l.length > 5 && l.length < 300);
-}
-
+// ─── Main parser ──────────────────────────────────────────────────────────────
 export function parseCV(rawText) {
-  const lines = rawText
-    .split(/\r?\n/)
+  // Normalise line endings and strip control chars except newlines
+  const cleaned = rawText
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/[^\x20-\x7E\n\u00C0-\u024F]/g, " ") // keep latin extended chars
+    .replace(/[ \t]+/g, " ");
+
+  const lines = cleaned
+    .split("\n")
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
   const data = {
     name: "",
     title: "",
-    email: extractEmail(rawText),
-    phone: extractPhone(rawText),
-    location: extractLocation(rawText),
-    website: extractWebsite(rawText),
+    email: extractEmail(cleaned),
+    phone: extractPhone(cleaned),
+    location: extractLocation(cleaned),
+    website: extractWebsite(cleaned),
     summary: "",
-    experience:     [],
-    education:      [],
-    skills:         [],
+    experience: [],
+    education: [],
+    skills: [],
     certifications: [],
-    languages:      [],
+    languages: [],
   };
 
-  // ── Name: first non-contact, non-empty line ─────────────────────────
-  for (const line of lines.slice(0, 5)) {
-    if (!isContactLine(line) && line.length > 1 && line.length < 60) {
-      data.name = line;
+  // Name: first short non-contact line
+  for (const line of lines.slice(0, 6)) {
+    if (
+      !isContactLine(line) &&
+      !detectSection(line) &&
+      line.length > 1 &&
+      line.length < 65 &&
+      !/^(http|www)/i.test(line)
+    ) {
+      data.name = line.replace(/,\s*$/, "");
       break;
     }
   }
 
-  // ── Title: line right after name that reads like a job title ────────
-  const nameIdx = lines.indexOf(data.name);
+  // Title: second short non-contact line after name
+  const nameIdx = lines.findIndex((l) => l === data.name);
   if (nameIdx !== -1) {
-    for (let i = nameIdx + 1; i < Math.min(nameIdx + 5, lines.length); i++) {
+    for (let i = nameIdx + 1; i < Math.min(nameIdx + 6, lines.length); i++) {
       const l = lines[i];
-      if (!isContactLine(l) && l.length > 2 && l.length < 80 && !detectSection(l)) {
+      if (
+        !isContactLine(l) &&
+        !detectSection(l) &&
+        l.length > 2 &&
+        l.length < 80 &&
+        !/^(http|www)/i.test(l)
+      ) {
         data.title = l;
         break;
       }
     }
   }
 
-  // ── Walk through lines and assign to sections ───────────────────────
+  // Walk sections
   let currentSection = null;
-  let sectionBuffer  = [];
+  let buffer = [];
 
-  const flushBuffer = () => {
-    if (!currentSection || sectionBuffer.length === 0) return;
-    processSection(currentSection, sectionBuffer, data);
-    sectionBuffer = [];
+  const flush = () => {
+    if (currentSection && buffer.length > 0) {
+      processSection(currentSection, [...buffer], data);
+    }
+    buffer = [];
   };
 
   for (const line of lines) {
-    const detected = detectSection(line);
-    if (detected) {
-      flushBuffer();
-      currentSection = detected;
+    const sec = detectSection(line);
+    if (sec) {
+      flush();
+      currentSection = sec;
       continue;
     }
-    if (currentSection) {
-      sectionBuffer.push(line);
-    }
+    if (currentSection) buffer.push(line);
   }
-  flushBuffer();
+  flush();
 
-  // ── Fallback: if no sections found, try to grab a summary paragraph ─
+  // Fallback summary from first long paragraph if none found
   if (!data.summary) {
-    const summaryCandidate = lines
-      .filter((l) => l.length > 40 && !isContactLine(l) && !detectSection(l))
-      .slice(0, 5);
-    if (summaryCandidate.length) data.summary = summaryCandidate.join(" ").slice(0, 400);
+    const candidate = lines
+      .filter((l) => l.length > 50 && !isContactLine(l) && !detectSection(l))
+      .slice(0, 4);
+    if (candidate.length) data.summary = candidate.join(" ").slice(0, 500);
   }
 
-  // ── Ensure arrays are never empty ───────────────────────────────────
+  // Ensure arrays never empty
   if (!data.experience.length)
     data.experience = [{ id: Date.now(), company: "", role: "", period: "", bullets: [""] }];
   if (!data.education.length)
     data.education = [{ id: Date.now() + 1, school: "", degree: "", year: "", gpa: "" }];
-  if (!data.skills.length)        data.skills         = [""];
+  if (!data.skills.length)         data.skills         = [""];
   if (!data.certifications.length) data.certifications = [""];
   if (!data.languages.length)      data.languages      = [""];
 
   return data;
 }
 
-/* ── Section processors ───────────────────────────────────────────────── */
-
+// ─── Section processors ───────────────────────────────────────────────────────
 function processSection(section, lines, data) {
   switch (section) {
     case "summary":
@@ -155,18 +167,19 @@ function processSection(section, lines, data) {
       break;
 
     case "skills": {
-      // Handles: comma-separated, bullet lists, or one-per-line
       const raw = lines.join(" , ");
       const items = raw
-        .split(/[,•\-\|·\n]/)
-        .map((s) => s.trim())
+        .split(/[,•·|\n\/]/)
+        .map((s) => s.replace(/^[-\s*]+/, "").trim())
         .filter((s) => s.length > 1 && s.length < 50);
-      data.skills = items.length ? items : [""];
+      data.skills = items.length ? [...new Set(items)] : [""];
       break;
     }
 
     case "certifications": {
-      const items = splitBullets(lines).filter((l) => l.length > 3);
+      const items = lines
+        .map((l) => l.replace(/^[•\-*\d.]+\s*/, "").trim())
+        .filter((l) => l.length > 3 && l.length < 150);
       data.certifications = items.length ? items : [""];
       break;
     }
@@ -174,8 +187,8 @@ function processSection(section, lines, data) {
     case "languages": {
       const raw = lines.join(" , ");
       const items = raw
-        .split(/[,•\-\|·\n]/)
-        .map((s) => s.trim())
+        .split(/[,•·|\n]/)
+        .map((s) => s.replace(/^[-\s*]+/, "").trim())
         .filter((s) => s.length > 1 && s.length < 60);
       data.languages = items.length ? items : [""];
       break;
@@ -193,193 +206,229 @@ function processSection(section, lines, data) {
 
 function parseExperienceBlock(lines) {
   const jobs = [];
-  let current = null;
+  let cur = null;
+
+  const pushCur = () => {
+    if (cur && (cur.company || cur.role)) {
+      if (!cur.bullets.length) cur.bullets = [""];
+      jobs.push(cur);
+    }
+  };
 
   for (const line of lines) {
     const period = extractPeriod(line);
 
-    // A line with a date range likely starts or belongs to a job header
     if (period) {
-      if (!current) {
-        current = { id: Date.now() + jobs.length, company: "", role: "", period, bullets: [] };
-      } else {
-        current.period = period;
-      }
-      // Try to extract company/role from same line minus the date
-      const withoutDate = line.replace(period, "").replace(/[-–|·,]+$/, "").trim();
-      if (withoutDate.length > 2) {
-        // Heuristic: if ALLCAPS or first word looks like company name
-        if (/^[A-Z][A-Z\s&.]+$/.test(withoutDate)) {
-          current.company = withoutDate;
-        } else {
-          current.role = withoutDate;
-        }
+      // New job entry when we hit a date line
+      if (cur && (cur.company || cur.role)) pushCur();
+      cur = { id: Date.now() + jobs.length + Math.random(), company: "", role: "", period, bullets: [] };
+      const rest = line.replace(period, "").replace(/[-–|·,()]+/g, " ").trim();
+      if (rest.length > 2) {
+        if (/^[A-Z][A-Z\s&.,]+$/.test(rest)) cur.company = rest;
+        else cur.role = rest;
       }
       continue;
     }
 
-    // Lines that look like a job title (short, title-case, no bullets)
-    if (
-      current &&
-      !line.startsWith("•") && !line.startsWith("-") &&
-      line.length < 80 &&
-      line.length > 3 &&
-      current.bullets.length === 0 &&
-      !current.role
-    ) {
-      current.role = line;
-      continue;
+    if (!cur) {
+      cur = { id: Date.now() + jobs.length + Math.random(), company: "", role: "", period: "", bullets: [] };
     }
 
-    // Lines that look like a company name (short, often ALL CAPS)
-    if (
-      current &&
-      !line.startsWith("•") && !line.startsWith("-") &&
-      line.length < 60 &&
-      line.length > 2 &&
-      current.bullets.length === 0 &&
-      !current.company
-    ) {
-      current.company = line;
-      continue;
-    }
+    const isBullet = /^[•\-*]\s/.test(line) || (cur.role && cur.company && line.length > 20);
 
-    // Bullet points / achievement lines
-    if (current && line.length > 10) {
-      const bullet = line.replace(/^[•\-\*]\s*/, "").trim();
-      if (bullet.length > 5) {
-        current.bullets.push(bullet);
+    if (isBullet || (cur.role && cur.company)) {
+      const bullet = line.replace(/^[•\-*]\s*/, "").trim();
+      if (bullet.length > 5 && bullet.length < 300) {
+        cur.bullets.push(bullet);
       }
-    }
-
-    // Blank-ish lines between jobs → push current, start fresh
-    if (!current) {
-      current = { id: Date.now() + jobs.length, company: "", role: "", period: "", bullets: [] };
+    } else if (!cur.role && line.length > 2 && line.length < 80) {
+      cur.role = line;
+    } else if (!cur.company && line.length > 2 && line.length < 60) {
+      cur.company = line;
     }
   }
 
-  if (current && (current.company || current.role)) {
-    if (!current.bullets.length) current.bullets = [""];
-    jobs.push(current);
-  }
+  pushCur();
 
   return jobs.length
-    ? jobs.map((j) => ({ ...j, bullets: j.bullets.length ? j.bullets : [""] }))
+    ? jobs
     : [{ id: Date.now(), company: "", role: "", period: "", bullets: [""] }];
 }
 
 function parseEducationBlock(lines) {
   const entries = [];
-  let current = null;
+  let cur = null;
 
   for (const line of lines) {
-    // Year match → start or update entry
     const yearMatch = line.match(/\b(19|20)\d{2}\b/);
+
     if (yearMatch) {
-      if (!current) current = { id: Date.now() + entries.length, school: "", degree: "", year: "", gpa: "" };
-      current.year = yearMatch[0];
-
-      // GPA in same line
-      const gpaMatch = line.match(/GPA[:\s]+(\d\.\d+)/i);
-      if (gpaMatch) current.gpa = gpaMatch[1];
-
-      const withoutYear = line.replace(/\b(19|20)\d{2}\b/, "").replace(/[-–|,()]+/g, " ").trim();
-      if (withoutYear.length > 2 && !current.degree) current.degree = withoutYear;
+      if (cur && (cur.school || cur.degree)) entries.push(cur);
+      cur = { id: Date.now() + entries.length + Math.random(), school: "", degree: "", year: yearMatch[0], gpa: "" };
+      const gpaMatch = line.match(/gpa[:\s]+(\d[\d.]+)/i);
+      if (gpaMatch) cur.gpa = gpaMatch[1];
+      const rest = line.replace(/\b(19|20)\d{2}\b/, "").replace(/[-–|,()gpa:\d.]+/gi, " ").trim();
+      if (rest.length > 2 && !cur.degree) cur.degree = rest;
       continue;
     }
 
-    if (!current) {
-      current = { id: Date.now() + entries.length, school: "", degree: "", year: "", gpa: "" };
+    if (!cur) {
+      cur = { id: Date.now() + entries.length + Math.random(), school: "", degree: "", year: "", gpa: "" };
     }
 
-    // Degree keywords
-    if (/\b(bachelor|master|phd|doctorate|bs|ba|ms|ma|mba|bsc|msc|bfa|associate|diploma|certificate)\b/i.test(line)) {
-      current.degree = line;
-      continue;
-    }
-
-    // Anything else is likely school name
-    if (!current.school && line.length > 3 && line.length < 100) {
-      current.school = line;
+    if (/\b(bachelor|master|phd|doctorate|b\.?s\.?|b\.?a\.?|m\.?s\.?|m\.?a\.?|mba|bsc|msc|bfa|mfa|associate|diploma|certificate|degree)\b/i.test(line)) {
+      cur.degree = line;
+    } else if (!cur.school && line.length > 3 && line.length < 100) {
+      cur.school = line;
     }
   }
 
-  if (current && (current.school || current.degree)) entries.push(current);
+  if (cur && (cur.school || cur.degree)) entries.push(cur);
 
   return entries.length
     ? entries
     : [{ id: Date.now(), school: "", degree: "", year: "", gpa: "" }];
 }
 
-/* ── File reader helper ───────────────────────────────────────────────── */
-
+// ─── File reader ──────────────────────────────────────────────────────────────
 /**
- * Reads a File object.
- * - .txt / .rtf → plain text
- * - .doc / .docx → best-effort text extraction from raw binary
- * - .pdf → extracts embedded text via regex (works for text-layer PDFs)
+ * Reads a File and returns plain text.
+ * PDF: uses PDF.js loaded from CDN for proper text extraction.
+ * DOCX: unzips and reads word/document.xml
+ * TXT/RTF: direct read
  */
-export function readFileAsText(file) {
+export async function readFileAsText(file) {
+  const ext = file.name.split(".").pop().toLowerCase();
+
+  if (ext === "pdf") {
+    return readPDF(file);
+  }
+
+  if (ext === "docx") {
+    return readDOCX(file);
+  }
+
+  // TXT, RTF, DOC (legacy binary) — read as text
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-
-    if (file.name.endsWith(".pdf")) {
-      reader.onload = (e) => {
-        try {
-          const binary = e.target.result;
-          // Extract readable strings from PDF binary
-          const strings = [];
-          const regex = /\(([^()\\]{3,})\)/g;
-          let m;
-          while ((m = regex.exec(binary)) !== null) {
-            const s = m[1].replace(/\\n/g, "\n").replace(/\\r/g, "").trim();
-            if (s.length > 2) strings.push(s);
-          }
-          // Also try BT...ET text blocks
-          const btRegex = /BT([\s\S]*?)ET/g;
-          let btM;
-          while ((btM = btRegex.exec(binary)) !== null) {
-            const block = btM[1];
-            const tjRegex = /\(([^)]{2,})\)\s*T[jJ]/g;
-            let tjM;
-            while ((tjM = tjRegex.exec(block)) !== null) {
-              strings.push(tjM[1].trim());
-            }
-          }
-          resolve(strings.join("\n"));
-        } catch (err) {
-          reject(err);
-        }
-      };
-      reader.readAsBinaryString(file);
-    } else if (file.name.endsWith(".docx") || file.name.endsWith(".doc")) {
-      reader.onload = (e) => {
-        try {
-          const binary = e.target.result;
-          // Extract readable text strings from docx XML
-          const xmlMatch = binary.match(/<w:t[^>]*>([^<]+)<\/w:t>/g) || [];
-          const text = xmlMatch
-            .map((t) => t.replace(/<[^>]+>/g, ""))
-            .join(" ")
-            .replace(/\s+/g, " ");
-
-          // Fallback: grab any readable ASCII strings > 3 chars
-          if (text.length < 50) {
-            const strings = binary.match(/[a-zA-Z@.+\-\d\s,()]{4,}/g) || [];
-            resolve(strings.join("\n"));
-          } else {
-            resolve(text);
-          }
-        } catch (err) {
-          reject(err);
-        }
-      };
-      reader.readAsBinaryString(file);
-    } else {
-      // Plain text (.txt, .rtf, etc.)
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = reject;
-      reader.readAsText(file);
-    }
+    reader.onload = (e) => resolve(e.target.result || "");
+    reader.onerror = () => reject(new Error("Could not read file"));
+    reader.readAsText(file, "UTF-8");
   });
+}
+
+// ── PDF via PDF.js CDN ────────────────────────────────────────────────────────
+async function readPDF(file) {
+  // Dynamically load PDF.js if not already present
+  if (!window.pdfjsLib) {
+    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const texts = [];
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items
+      .map((item) => item.str)
+      .join(" ")
+      .replace(/\s+/g, " ");
+    texts.push(pageText);
+  }
+
+  return texts.join("\n");
+}
+
+// ── DOCX via JSZip ────────────────────────────────────────────────────────────
+async function readDOCX(file) {
+  // Dynamically load JSZip if not already present
+  if (!window.JSZip) {
+    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js");
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const zip = await window.JSZip.loadAsync(arrayBuffer);
+  const xmlFile = zip.file("word/document.xml");
+
+  if (!xmlFile) throw new Error("Not a valid DOCX file");
+
+  const xmlText = await xmlFile.async("string");
+
+  // Extract text from <w:t> tags and insert newlines at paragraph breaks
+  const paragraphs = xmlText.split(/<w:p[ >]/);
+  const lines = paragraphs.map((para) => {
+    const matches = para.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+    return matches.map((m) => m.replace(/<[^>]+>/g, "")).join(" ").trim();
+  });
+
+  return lines.filter((l) => l.length > 0).join("\n");
+}
+
+// ── Script loader helper ──────────────────────────────────────────────────────
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error(`Failed to load ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+// ─── Bridge: parse CV text → new data model shape ─────────────────────────────
+import { EMPTY_EXPERIENCE, EMPTY_EDUCATION } from "./dataModel.js";
+
+export function parseCVToModel(rawText) {
+  const parsed = parseCV(rawText);
+
+  return {
+    fullName: parsed.name || "",
+    email:    parsed.email || "",
+    phone:    parsed.phone || "",
+    location: parsed.location || "",
+    website:  parsed.website || "",
+    summary:  parsed.summary || "",
+
+    experience: parsed.experience.map((e) => ({
+      ...EMPTY_EXPERIENCE(),
+      id:               e.id || Date.now() + Math.random(),
+      jobTitle:         e.role    || "",
+      company:          e.company || "",
+      location:         "",
+      startDate:        "",
+      endDate:          "",
+      currentlyWorking: /present|current|now/i.test(e.period || ""),
+      description:      (e.bullets || []).filter(Boolean).join("\n"),
+    })),
+
+    education: parsed.education.map((e) => ({
+      ...EMPTY_EDUCATION(),
+      id:             e.id || Date.now() + Math.random(),
+      school:         e.school || "",
+      degree:         e.degree || "",
+      fieldOfStudy:   "",
+      country:        "",
+      city:           "",
+      startYear:      "",
+      graduationYear: e.year || "",
+    })),
+
+    skills:      parsed.skills.filter(Boolean),
+    skillInput:  "",
+    summary:     parsed.summary || "",
+
+    extras: [
+      ...parsed.certifications.filter(Boolean).map((v) => ({
+        id: Date.now() + Math.random(), type: "certification", value: v
+      })),
+      ...parsed.languages.filter(Boolean).map((v) => ({
+        id: Date.now() + Math.random(), type: "language", value: v
+      })),
+    ],
+  };
 }
