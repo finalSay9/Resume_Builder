@@ -53,7 +53,7 @@ export default function ClassicTemplate({ data, t }) {
                   <span style={{ color: "#888" }}>{e.period}</span>
                 </div>
                 <ul style={{ margin: "4px 0", paddingLeft: "16px" }}>
-                  {e.bullets.filter((b) => b).map((b, i) => (
+                  {e.bullets || [].map((b, i) => (
                     <li key={i} style={{ marginBottom: "2px" }}>{b}</li>
                   ))}
                 </ul>

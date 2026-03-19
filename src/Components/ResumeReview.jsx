@@ -4,7 +4,7 @@ import CreativeTemplate from "../Templates/CreativeTemplate";
 import MinimalTemplate  from "../Templates/MinimalTemplate";
 import BoldTemplate     from "../Templates/BoldTemplate";
 import ElegantTemplate  from "../Templates/ElegantTemplate";
-import { TEMPLATE_THEMES } from "../utils/constants";
+import { TEMPLATE_THEMES } from "../utils/Constants";
 import { normalizeData }   from "../utils/templateHelpers";
 
 export default function ResumePreview({ data, template }) {
